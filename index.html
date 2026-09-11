@@ -1,0 +1,1835 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control y Asistencia | CNEL EP</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Firebase App & Firestore SDK (Versión Compat para mantener compatibilidad con eventos inline) -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        :root {
+            --bg-app: #f8fafc;
+            --primary: #0284c7;
+            --primary-dark: #0369a1;
+            --secondary: #0f172a;
+            --card-bg: #ffffff;
+            --text-main: #1e293b;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --success: #10b981;
+            --radius: 12px;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.1);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-app);
+            color: var(--text-main);
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background: linear-gradient(135deg, var(--secondary) 0%, #1e293b 100%);
+            color: #ffffff;
+            padding: 16px 24px;
+            box-shadow: var(--shadow-md);
+            border-bottom: 3px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .header-logo {
+            height: 72px;
+            background: #ffffff;
+            padding: 6px 12px;
+            border-radius: 12px;
+            object-fit: contain;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px solid var(--primary);
+            box-shadow: 0 0 0 3px rgba(2,132,199,0.15);
+            animation: cnel-logo-glow 2.2s ease-in-out infinite;
+        }
+
+        .cnel-truck-svg { width: 96px; height: 62px; overflow: visible; filter: drop-shadow(0 2px 3px rgba(0,0,0,0.15)); }
+        .cnel-truck-wheel {
+            transform-origin: center;
+            transform-box: fill-box;
+            animation: cnel-wheel-spin 1.4s linear infinite;
+        }
+        .cnel-truck-bolt {
+            transform-origin: center;
+            transform-box: fill-box;
+            animation: cnel-bolt-pulse 1.1s ease-in-out infinite;
+            filter: drop-shadow(0 0 4px #f59e0b);
+        }
+        .cnel-truck-body {
+            animation: cnel-truck-bounce 2.4s ease-in-out infinite;
+        }
+        @keyframes cnel-wheel-spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes cnel-bolt-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.35; transform: scale(0.85); }
+        }
+        @keyframes cnel-truck-bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-1.5px); }
+        }
+        @keyframes cnel-logo-glow {
+            0%, 100% { box-shadow: 0 0 0 3px rgba(2,132,199,0.15); }
+            50% { box-shadow: 0 0 0 6px rgba(2,132,199,0.30); }
+        }
+
+        header h1 {
+            margin: 0;
+            font-size: 18px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .dashboard-stats {
+            display: flex;
+            justify-content: center;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--text-muted);
+            box-shadow: var(--shadow-sm);
+        }
+
+        .main-layout {
+            max-width: 1280px;
+            margin: 16px auto;
+            padding: 0 20px;
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            align-items: start;
+        }
+
+        @media (max-width: 960px) {
+            .main-layout { grid-template-columns: 1fr; }
+        }
+
+        .calendar-panel, .management-panel {
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border);
+        }
+
+        .calendar-header { display: flex; justify-content: space-between; margin-bottom: 16px; }
+        .calendar-header button { padding: 6px 10px; border-radius: 8px; cursor: pointer; border: 1px solid var(--border); }
+        .calendar-selectors select { padding: 6px; border-radius: 6px; }
+        
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            text-align: center;
+        }
+
+        .calendar-cell {
+            padding: 8px 0; font-size: 13px; cursor: pointer; border-radius: 6px;
+            background: #f8fafc; transition: 0.2s; position: relative;
+        }
+        .calendar-cell:hover { background: #e0f2fe; }
+        .calendar-cell.selected { background: var(--primary); color: white; font-weight: 600; }
+        .calendar-cell.has-data::after {
+            content: '';
+            display: block;
+            width: 5px;
+            height: 5px;
+            background: var(--success);
+            border-radius: 50%;
+            margin: 2px auto 0 auto;
+        }
+        .calendar-cell.selected.has-data::after { background: #ffffff; }
+
+        .calendar-stat-box {
+            margin-top: 14px;
+            padding: 12px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-main-container {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .stat-main {
+            cursor: pointer;
+            padding: 6px;
+            border-radius: 8px;
+            transition: background 0.2s ease;
+        }
+        .stat-main:hover { background: #f1f5f9; }
+
+        .stat-main label {
+            display: block;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            cursor: pointer;
+        }
+
+        .stat-main b { font-size: 20px; color: var(--primary-dark); }
+
+        .stat-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 6px;
+        }
+
+        .stat-item {
+            padding: 6px 4px;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            cursor: pointer;
+            transition: transform 0.15s ease;
+        }
+
+        .stat-item:hover { transform: translateY(-2px); }
+        .stat-item span { font-size: 16px; font-weight: 700; }
+        .stat-item label { font-size: 9px; font-weight: 700; text-transform: uppercase; margin-top: 2px; cursor: pointer; }
+
+        .stat-present { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+        .stat-absent { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+        .stat-novelty { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
+
+        .shifts-container {
+            max-width: 1280px;
+            margin: 0 auto 16px auto;
+            padding: 0 20px;
+        }
+        .shifts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 12px;
+            background: var(--card-bg);
+            padding: 14px 18px;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-sm);
+        }
+        .shift-card {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #f8fafc;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        .shift-info { display: flex; flex-direction: column; }
+        .shift-title { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .shift-count { font-size: 18px; font-weight: 700; color: var(--secondary); }
+
+        .management-panel { 
+            text-align: center; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 14px; 
+            height: fit-content; 
+        }
+
+        .management-buttons { 
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); 
+            gap: 10px; 
+            justify-content: center; 
+        }
+        
+        .btn-action {
+            color: white; border: none; padding: 12px 14px; font-size: 13px;
+            font-weight: 600; border-radius: 10px; cursor: pointer; display: flex; 
+            gap: 8px; align-items: center; justify-content: center; width: 100%;
+            transition: filter 0.2s, transform 0.1s;
+        }
+        .btn-action:hover { filter: brightness(0.92); transform: translateY(-1px); }
+
+        .truck-container {
+            max-width: 1280px; margin: 0 auto 40px auto; padding: 0 20px;
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 16px;
+        }
+
+        .truck-card {
+            background: var(--card-bg); border: 1px solid var(--border);
+            border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow-sm);
+            border-top: 4px solid var(--primary);
+        }
+
+        .truck-header {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid var(--border); padding-bottom: 10px; margin-bottom: 10px;
+        }
+
+        .truck-header h2 { margin: 0; font-size: 16px; color: var(--secondary); text-transform: uppercase; }
+        .delete-btn { background: #ffeeef; color: var(--danger); border: none; border-radius: 6px; cursor: pointer; padding: 6px 10px; font-size: 12px; font-weight: 600; }
+        .delete-btn:hover { background: #fecaca; }
+
+        .truck-config-row {
+            display: flex; justify-content: space-between; align-items: center;
+            background: #f8fafc; padding: 6px 10px; border-radius: 8px;
+            border: 1px solid var(--border); margin-bottom: 6px;
+        }
+        
+        .truck-config-row label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .truck-config-row select, .truck-config-row input {
+            padding: 4px 6px; border-radius: 6px; border: 1px solid var(--border); font-size: 12px; font-weight: 600;
+        }
+
+        .truck-obs-row {
+            display: flex; flex-direction: column; gap: 4px;
+            background: #f8fafc; padding: 8px 10px; border-radius: 8px;
+            border: 1px solid var(--border); margin-bottom: 6px;
+        }
+        .truck-obs-row label { font-size: 11px; font-weight: 700; color: var(--text-muted); text-transform: uppercase; }
+        .truck-obs-row textarea {
+            width: 100%; padding: 6px 8px; border-radius: 6px; border: 1px solid var(--border);
+            font-size: 12px; font-family: 'Inter', sans-serif; resize: vertical; min-height: 34px;
+        }
+
+        .uppercase-input { text-transform: uppercase; }
+
+        .crew-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+        .crew-member-row {
+            background: #f8fafc; border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px;
+        }
+        .crew-name { font-weight: 600; font-size: 12px; text-transform: uppercase; }
+        .role { font-size: 10px; background: #e0f2fe; padding: 2px 6px; border-radius: 4px; color: var(--primary-dark); text-transform: uppercase; }
+        
+        .btn-add-crew {
+            background: #f1f5f9; border: 1px dashed var(--primary); color: var(--primary);
+            width: 100%; padding: 8px; border-radius: 8px; cursor: pointer;
+            font-size: 12px; font-weight: 600; margin-top: 8px; transition: 0.2s;
+        }
+        .btn-add-crew:hover { background: #e0f2fe; }
+
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.6); display: flex; justify-content: center;
+            align-items: center; z-index: 1000; opacity: 0; pointer-events: none;
+            transition: opacity 0.2s ease;
+        }
+        .modal-overlay.active { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: var(--card-bg); padding: 28px; border-radius: 16px;
+            width: 90%; max-width: 520px; max-height: 90vh; overflow-y: auto;
+        }
+        .form-group { margin-bottom: 14px; }
+        .form-group label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 4px; color: var(--text-muted); }
+        .form-group input, .form-group select { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); }
+        .form-group textarea { width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font-family: 'Inter', sans-serif; resize: vertical; min-height: 60px; }
+        
+        .modal-actions { display: flex; gap: 10px; margin-top: 18px; }
+        .modal-actions button { flex: 1; padding: 10px; border-radius: 8px; font-weight: 600; cursor: pointer; border: none; }
+        .btn-save { background: var(--primary); color: white; }
+        .btn-cancel { background: #f1f5f9; border: 1px solid var(--border); }
+
+        .summary-kpi-container { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .kpi-card { background: #f8fafc; border: 1px solid var(--border); padding: 10px; border-radius: 10px; text-align: center; }
+        .kpi-card span { display: block; font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); }
+        .kpi-card b { font-size: 18px; color: var(--secondary); }
+        
+        .alerts-box { background: #fffbeb; border: 1px solid #fcd34d; border-radius: 10px; padding: 12px; margin-bottom: 16px; }
+        .alerts-box h4 { margin: 0 0 8px 0; color: #b45309; font-size: 13px; }
+        .alerts-box ul { margin: 0; padding-left: 18px; font-size: 12px; color: #92400e; }
+
+        .summary-table { width: 100%; border-collapse: collapse; font-size: 12px; text-align: left; }
+        .summary-table th { background: #f1f5f9; padding: 8px; font-weight: 600; border-bottom: 2px solid var(--border); }
+        .summary-table td { padding: 8px; border-bottom: 1px solid var(--border); }
+        .status-badge { padding: 3px 6px; border-radius: 20px; font-size: 10px; font-weight: 600; }
+        .status-ok { background: #d1fae5; color: #065f46; }
+        .status-warning { background: #fef3c7; color: #92400e; }
+        
+        .badge-count { font-weight: 700; padding: 2px 6px; border-radius: 12px; font-size: 11px; }
+        .badge-present { background: #ecfdf5; color: #047857; }
+        .badge-absent { background: #fef2f2; color: #b91c1c; }
+        .badge-novelty { background: #fffbeb; color: #b45309; }
+
+        .monthly-filters { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+        .monthly-filters select { flex: 1; min-width: 150px; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border); font-size: 12px; font-weight: 600; background: #fff; color: var(--text-main); }
+        .monthly-count-note { font-size: 11px; color: var(--text-muted); margin: -6px 0 12px 2px; }
+        tr.monthly-row-item.row-critical { background: #fef2f2; }
+        tr.monthly-row-item.row-critical .person-name { color: var(--danger); }
+        tr.monthly-row-item.row-warning { background: #fffbeb; }
+        .alert-icon { margin-right: 4px; }
+
+        .modal-crew-row {
+            display: flex; flex-direction: column; gap: 6px; margin-bottom: 8px;
+            background: #f8fafc; padding: 6px; border-radius: 8px; border: 1px solid var(--border);
+        }
+        .modal-crew-row-top { display: flex; gap: 8px; align-items: center; }
+        .modal-crew-status-row { display: flex; gap: 6px; align-items: center; }
+
+        .schedule-legend { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:14px; font-size:12px; font-weight:600; color: var(--text-muted); }
+        .schedule-legend span { display:flex; align-items:center; gap:5px; }
+        .schedule-swatch { width:13px; height:13px; border-radius:4px; display:inline-block; border:1px solid rgba(0,0,0,0.15); }
+        .schedule-scroll { overflow-x: auto; margin-bottom: 10px; border: 1px solid var(--border); border-radius: 10px; }
+        .schedule-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+        .schedule-table th, .schedule-table td { border: 1px solid var(--border); padding: 6px 8px; text-align: center; white-space: nowrap; }
+        .schedule-table thead th { background: #f1f5f9; font-weight: 700; color: var(--text-main); }
+        .schedule-name-col { text-align: left !important; position: sticky; left: 0; background: var(--card-bg); z-index: 2; font-weight: 700; }
+        thead .schedule-name-col { background: #f1f5f9; z-index: 3; }
+        .shift-cell-manana { background:#e0f2fe; color:#075985; font-weight:700; }
+        .shift-cell-tarde { background:#fef3c7; color:#92400e; font-weight:700; }
+        .shift-cell-amanecida { background:#ede9fe; color:#5b21b6; font-weight:700; }
+        .shift-cell-guardia { background:#fee2e2; color:#991b1b; font-weight:700; }
+        .shift-cell-empty { color: #cbd5e1; }
+    </style>
+</head>
+<body>
+
+    <datalist id="personnel-suggestions">
+        <option value="ABEL NAVARRETE"></option>
+        <option value="ALEX GOMEZ"></option>
+        <option value="ALEX TIGRERO"></option>
+        <option value="BRAULIO MORAN"></option>
+        <option value="CARLOS CASTILLO"></option>
+        <option value="CARLOS GEACOMAN"></option>
+        <option value="CARLOS JARAMILLO"></option>
+        <option value="CARLOS VINCES"></option>
+        <option value="CRISTIAN CÓRDOVA"></option>
+        <option value="CÉSAR BAJAÑA"></option>
+        <option value="DANIEL DEL PEZO"></option>
+        <option value="DANILO CHOEZ"></option>
+        <option value="DARWIN GUZMÁN"></option>
+        <option value="DAVID ALCIVAR"></option>
+        <option value="DENNIS MOSQUEDA"></option>
+        <option value="EDDY FERNANDEZ"></option>
+        <option value="EDWIN ROJAS"></option>
+        <option value="EDÚ VILLARREAL"></option>
+        <option value="ELTON ANGULO"></option>
+        <option value="ERNESTO SÁNCHEZ"></option>
+        <option value="EZEQUIEL BRAVO"></option>
+        <option value="FABRICIO CEDEÑO"></option>
+        <option value="FELIPE ESPINOZA"></option>
+        <option value="FRANCISCO VITERI"></option>
+        <option value="FREDDY COELLO"></option>
+        <option value="FREDDY KOCHER"></option>
+        <option value="FÉLIX LEON"></option>
+        <option value="GALO RAMÍREZ"></option>
+        <option value="GEORGE GALARZA"></option>
+        <option value="GUILLERMO GARCÍA"></option>
+        <option value="GUILLERMO PACHO"></option>
+        <option value="GUSTAVO CAMPUZANO"></option>
+        <option value="HENRY RODRIGUEZ"></option>
+        <option value="HENRY VITERI"></option>
+        <option value="HERMOGENES FERRIN"></option>
+        <option value="HIPÓLITO SÁNCHEZ"></option>
+        <option value="HUGO ROBINS"></option>
+        <option value="JAIR NAVARRETE"></option>
+        <option value="JEAN PIERE CABRERA"></option>
+        <option value="JEFFERSON LEÓN"></option>
+        <option value="JHON ZAMORA"></option>
+        <option value="JIMMY GARCIA"></option>
+        <option value="JOHN REYES"></option>
+        <option value="JOHNNY MICOLTA"></option>
+        <option value="JORGE CUSME"></option>
+        <option value="JORGE GOMEZ"></option>
+        <option value="JORGE PADILLA"></option>
+        <option value="JORGE PALADINES"></option>
+        <option value="JORGE SÁNCHEZ"></option>
+        <option value="JORGE ZUÑIGA"></option>
+        <option value="JOSE OBREGÓN"></option>
+        <option value="JOSÉ CHELE"></option>
+        <option value="JUAN CAMPOS"></option>
+        <option value="LEONARDO NOBOA"></option>
+        <option value="LEVIS VERA"></option>
+        <option value="LEYTON PINARGOTE"></option>
+        <option value="LUIS BAQUERIZO"></option>
+        <option value="LUIS NOBOA"></option>
+        <option value="LUIS TIXI"></option>
+        <option value="MARCELO MUÑOZ"></option>
+        <option value="MARCO ENGRACIA"></option>
+        <option value="MARCOS MENDEZ"></option>
+        <option value="MARIO CARRIEL"></option>
+        <option value="NICKY MOREIRA"></option>
+        <option value="OSCAR VELEZ"></option>
+        <option value="ROBERTO MACIAS"></option>
+        <option value="RODOLFO MOSQUERA"></option>
+        <option value="RODY RAMIREZ"></option>
+        <option value="RONNY CASTILLO"></option>
+        <option value="ROQUE CEDEÑO"></option>
+        <option value="STEVE LINO"></option>
+        <option value="STEVEN ARCENTALES"></option>
+        <option value="STEVEN MORÁN"></option>
+        <option value="VICTOR NARVÁEZ"></option>
+        <option value="WILSON GODOY"></option>
+    </datalist>
+
+    <header>
+        <div class="header-brand">
+            <div class="header-logo" title="CNEL EP">
+                <svg class="cnel-truck-svg" viewBox="0 0 120 70" xmlns="http://www.w3.org/2000/svg">
+                    <g class="cnel-truck-body">
+                        <ellipse cx="60" cy="62" rx="48" ry="4" fill="#0f172a" opacity="0.12"/>
+                        <rect x="6" y="24" width="58" height="26" rx="4" fill="#0284c7"/>
+                        <rect x="10" y="28" width="50" height="10" rx="2" fill="#e0f2fe" opacity="0.5"/>
+                        <path d="M64 30 H92 a6 6 0 0 1 6 6 v14 a2 2 0 0 1 -2 2 H64 Z" fill="#0369a1"/>
+                        <rect x="70" y="34" width="18" height="12" rx="2" fill="#bae6fd"/>
+                        <polygon class="cnel-truck-bolt" points="30,4 20,26 28,26 22,42 42,18 32,18" fill="#f59e0b" stroke="#b45309" stroke-width="1"/>
+                        <rect x="4" y="48" width="98" height="4" rx="2" fill="#0f172a"/>
+                        <g class="cnel-truck-wheel">
+                            <circle cx="26" cy="54" r="9" fill="#1e293b"/>
+                            <circle cx="26" cy="54" r="4" fill="#94a3b8"/>
+                            <rect x="25" y="46" width="2" height="16" fill="#475569"/>
+                            <rect x="18" y="53" width="16" height="2" fill="#475569"/>
+                        </g>
+                        <g class="cnel-truck-wheel">
+                            <circle cx="82" cy="54" r="9" fill="#1e293b"/>
+                            <circle cx="82" cy="54" r="4" fill="#94a3b8"/>
+                            <rect x="81" y="46" width="2" height="16" fill="#475569"/>
+                            <rect x="74" y="53" width="16" height="2" fill="#475569"/>
+                        </g>
+                    </g>
+                </svg>
+            </div>
+            <h1>CONTROL Y ASISTENCIA DE LAS CUADRILLAS/CNEL +</h1>
+        </div>
+        <div style="font-size: 13px; font-weight: 500; color: #94a3b8;">REDES DE DISTRIBUCIÓN</div>
+    </header>
+
+    <div class="dashboard-stats">
+        <span>📅 Fecha Seleccionada: <span id="display-date-stat" style="color: var(--primary);"></span></span>
+    </div>
+
+    <div class="main-layout">
+        <div class="calendar-panel">
+            <div class="calendar-header">
+                <button onclick="changeMonth(-1)">◀</button>
+                <div class="calendar-selectors">
+                    <select id="select-month" onchange="onMonthYearChange()">
+                        <option value="0">Enero</option><option value="1">Febrero</option>
+                        <option value="2">Marzo</option><option value="3">Abril</option>
+                        <option value="4">Mayo</option><option value="5">Junio</option>
+                        <option value="6">Julio</option><option value="7">Agosto</option>
+                        <option value="8">Septiembre</option><option value="9">Octubre</option>
+                        <option value="10">Noviembre</option><option value="11">Diciembre</option>
+                    </select>
+                    <select id="select-year" onchange="onMonthYearChange()"></select>
+                </div>
+                <button onclick="changeMonth(1)">▶</button>
+            </div>
+            <div class="calendar-grid" id="calendar-days-grid"></div>
+
+            <div class="calendar-stat-box">
+                <div class="stat-main-container">
+                    <div class="stat-main">
+                        <label>🚚 Cuadrillas</label>
+                        <b id="display-total-trucks">0</b>
+                    </div>
+                    <div class="stat-main" onclick="showPersonnelList('Todos')" title="Ver nómina completa del día">
+                        <label>👥 Total Personal</label>
+                        <b id="display-total-personnel" style="color: var(--secondary);">0</b>
+                    </div>
+                </div>
+                <div class="stat-grid">
+                    <div class="stat-item stat-present" onclick="showPersonnelList('Asistencia')" title="Ver lista de presentes">
+                        <span id="display-total-present">0</span>
+                        <label>Presentes</label>
+                    </div>
+                    <div class="stat-item stat-absent" onclick="showPersonnelList('Falta')" title="Ver personas que faltaron">
+                        <span id="display-total-absent">0</span>
+                        <label>Faltas</label>
+                    </div>
+                    <div class="stat-item stat-novelty" onclick="showPersonnelList('Novedad')" title="Ver novedades">
+                        <span id="display-total-novelties">0</span>
+                        <label>Novedades</label>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="management-panel">
+            <h3 style="margin: 0; color: var(--secondary); font-size: 16px;">Gestión Diaria de Flota</h3>
+            <div class="management-buttons">
+                <button class="btn-action" style="background: var(--success);" onclick="openAddModal()">⚡ Agregar Cuadrilla</button>
+                <button class="btn-action" style="background: var(--primary);" onclick="showSimplifiedSummary()">📋 Resumen Diario</button>
+                <button class="btn-action" style="background: #6366f1;" onclick="showMonthlyReport()">📊 Reporte Mensual</button>
+                <button class="btn-action" style="background: #0d9488;" onclick="showScheduleReport()">🕒 Horarios del Mes</button>
+                
+                <input type="file" id="import-file" accept=".json" style="display: none;" onchange="importData(event)">
+                
+                <button class="btn-action" style="background: #0ea5e9;" onclick="document.getElementById('import-file').click()">📥 Cargar Datos</button>
+                <button class="btn-action" style="background: #8b5cf6;" onclick="exportData()">📤 Exportar Backup</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="shifts-container" id="shifts-summary-bar">
+        <div class="shifts-grid">
+            <div class="shift-card">
+                <div class="shift-info">
+                    <span class="shift-title">☀️ Mañana</span>
+                    <span class="shift-count" id="count-manana">0</span>
+                </div>
+                <span style="font-size: 20px;">🚛</span>
+            </div>
+            <div class="shift-card">
+                <div class="shift-info">
+                    <span class="shift-title">⛅ Tarde</span>
+                    <span class="shift-count" id="count-tarde">0</span>
+                </div>
+                <span style="font-size: 20px;">🚚</span>
+            </div>
+            <div class="shift-card">
+                <div class="shift-info">
+                    <span class="shift-title">🌙 Amanecida</span>
+                    <span class="shift-count" id="count-amanecida">0</span>
+                </div>
+                <span style="font-size: 20px;">🌌</span>
+            </div>
+            <div class="shift-card">
+                <div class="shift-info">
+                    <span class="shift-title">⏰ Guardia Chiquita</span>
+                    <span class="shift-count" id="count-g-chiquita">0</span>
+                </div>
+                <span style="font-size: 20px;">⏱️</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="truck-container" id="truck-container"></div>
+
+    <div id="add-crew-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 400px;">
+            <h3 style="text-align:center; margin-top:0;">Agregar Personal a Cuadrilla</h3>
+            <input type="hidden" id="modal-crew-truck-index">
+            <div class="form-group">
+                <label>Nombre del Colaborador: *</label>
+                <input type="text" id="modal-crew-name" class="uppercase-input" list="personnel-suggestions" placeholder="ESCRIBA NOMBRE...">
+            </div>
+            <div class="form-group">
+                <label>Rol / Cargo:</label>
+                <select id="modal-crew-role">
+                    <option value="Técnico">Técnico</option>
+                    <option value="Conductor">Conductor</option>
+                    <option value="Auxiliar">Auxiliar / Liniero</option>
+                    <option value="Apoyo">Apoyo</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Estado:</label>
+                <select id="modal-crew-status" onchange="toggleExtraCrewDetalle()">
+                    <option value="Asistencia">✅ Asistencia</option>
+                    <option value="Falta">❌ Falta</option>
+                    <option value="Novedad">⚠️ Novedad</option>
+                </select>
+            </div>
+            <div class="form-group" id="modal-crew-detalle-group" style="display:none; background:#fffbeb; padding:10px; border-radius:8px; border:1px solid #fcd34d;">
+                <label style="color:#b45309;">Detalle de la novedad:</label>
+                <input type="text" id="modal-crew-detalle" class="uppercase-input" placeholder="Ej. Permiso médico">
+            </div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModals()">Cancelar</button>
+                <button class="btn-save" onclick="processAddExtraCrew()">Agregar Personal</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="personnel-detail-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 550px;">
+            <h3 id="personnel-modal-title" style="text-align:center; margin-top:0; color: var(--secondary);"></h3>
+            <div id="personnel-modal-list"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModals()">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="add-truck-modal" class="modal-overlay">
+        <div class="modal-content">
+            <h3 style="text-align:center; margin-top:0;">Registrar Nueva Cuadrilla</h3>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <div class="form-group">
+                    <label>Número de Cuadrilla: *</label>
+                    <input type="number" id="modal-new-id" placeholder="Ej. 100">
+                </div>
+                <div class="form-group">
+                    <label>Salieron en cuadrilla: (Opcional)</label>
+                    <input type="text" id="modal-new-dispatched" class="uppercase-input" placeholder="Referencia">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Observaciones: (Opcional)</label>
+                <textarea id="modal-new-observaciones" placeholder="Ej. Cuadrilla con falla en luces, revisar antes de salir..."></textarea>
+            </div>
+
+            <div class="form-group">
+                <label>Tipo de Trabajo Realizado: (Opcional)</label>
+                <div style="display:flex; gap:16px; flex-wrap:wrap; background:#f8fafc; border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:12px; color:var(--text-main); text-transform:none; cursor:pointer;">
+                        <input type="checkbox" class="modal-new-tipo-trabajo" value="Cuentas"> Cuentas
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:12px; color:var(--text-main); text-transform:none; cursor:pointer;">
+                        <input type="checkbox" class="modal-new-tipo-trabajo" value="Emergencia"> Emergencia
+                    </label>
+                    <label style="display:flex; align-items:center; gap:6px; font-weight:600; font-size:12px; color:var(--text-main); text-transform:none; cursor:pointer;">
+                        <input type="checkbox" class="modal-new-tipo-trabajo" value="Trabajos Ejecutados"> Trabajos Ejecutados
+                    </label>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label>Horario Laboral:</label>
+                <select id="modal-new-work-hours" onchange="toggleGuardiaChiquitaModal()">
+                    <option value="Mañana">Mañana</option>
+                    <option value="Tarde">Tarde</option>
+                    <option value="Amanecida">Amanecida</option>
+                    <option value="Guardia Chiquita">Guardia Chiquita</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="modal-subhours-group" style="display: none; background: #fffbeb; padding: 12px; border-radius: 8px; border: 1px solid #fcd34d;">
+                <label style="color: #b45309;">⏰ Turno Guardia Chiquita:</label>
+                <select id="modal-new-subhours">
+                    <option value="16:00 a 20:00">16:00 a 20:00</option>
+                    <option value="6:30 a 14:00">6:30 a 14:00</option>
+                    <option value="08:00 a 12:00">08:00 a 12:00</option>
+                </select>
+            </div>
+            
+            <div class="form-group" style="border-top: 1px solid var(--border); padding-top: 12px; margin-top: 12px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <label style="margin: 0; font-size: 13px; color: var(--secondary);">👥 Personal Asignado:</label>
+                    <button type="button" class="btn-add-crew" onclick="addModalCrewRow()" style="width: auto; padding: 4px 10px; margin: 0; font-size: 11px;">➕ Agregar Integrante</button>
+                </div>
+                <div id="modal-crew-list-container"></div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModals()">Cancelar</button>
+                <button class="btn-save" onclick="processNewTruck()">Guardar Camión</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="summary-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 750px;">
+            <h2 style="text-align: center; margin-top: 0;">REPORTE EJECUTIVO DIARIO</h2>
+            <div id="summary-content"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModals()">Cerrar</button>
+                <button class="btn-save" onclick="window.print()">🖨️ Imprimir Resumen</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="monthly-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 800px;">
+            <h2 style="text-align: center; margin-top: 0; color: var(--secondary);" id="monthly-modal-title">REPORTE CONSOLIDADO MENSUAL</h2>
+
+            <div class="monthly-filters">
+                <select id="monthly-filter-role" onchange="renderMonthlyTable()">
+                    <option value="all">Todos los cargos</option>
+                </select>
+                <select id="monthly-filter-truck" onchange="renderMonthlyTable()">
+                    <option value="all">Todas las unidades</option>
+                </select>
+                <select id="monthly-sort" onchange="renderMonthlyTable()">
+                    <option value="worst">⚠️ Peor asistencia primero</option>
+                    <option value="best">✅ Mejor asistencia primero</option>
+                    <option value="absences">❌ Más faltas primero</option>
+                    <option value="name">🔤 Nombre (A-Z)</option>
+                </select>
+            </div>
+
+            <div style="margin-bottom: 8px;">
+                <input type="text" id="monthly-search-input" class="uppercase-input" placeholder="🔍 BUSCAR TRABAJADOR POR NOMBRE..." oninput="renderMonthlyTable()" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid var(--border);">
+            </div>
+            <div class="monthly-count-note" id="monthly-count-note"></div>
+
+            <div id="monthly-content"></div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModals()">Cerrar</button>
+                <button class="btn-save" onclick="window.print()">🖨️ Imprimir Reporte Mensual</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="schedule-modal" class="modal-overlay">
+        <div class="modal-content" style="max-width: 950px;">
+            <h2 style="text-align: center; margin-top: 0; color: var(--secondary);" id="schedule-modal-title">HORARIOS TRABAJADOS EN EL MES</h2>
+            <div class="schedule-legend">
+                <span><span class="schedule-swatch shift-cell-manana"></span> Mañana</span>
+                <span><span class="schedule-swatch shift-cell-tarde"></span> Tarde</span>
+                <span><span class="schedule-swatch shift-cell-amanecida"></span> Amanecida</span>
+                <span><span class="schedule-swatch shift-cell-guardia"></span> Guardia Chiquita</span>
+                <span><span class="schedule-swatch shift-cell-empty" style="background:#f8fafc;"></span> Sin registro</span>
+            </div>
+            <div id="schedule-content"></div>
+            <div class="modal-actions">
+                <button class="btn-cancel" onclick="closeModals()">Cerrar</button>
+                <button class="btn-save" onclick="window.print()">🖨️ Imprimir Horarios</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Configuración de Firebase Cloud Firestore
+        const firebaseConfig = {
+            apiKey: "AIzaSyAJNKZTogktnLFVuiLhlFcfTKrs-PRB0SA",
+            authDomain: "operaciones-da574.firebaseapp.com",
+            projectId: "operaciones-da574",
+            storageBucket: "operaciones-da574.firebasestorage.app",
+            messagingSenderId: "69113839963",
+            appId: "1:69113839963:web:34be4e4b5327756de25a7e",
+            measurementId: "G-D9349LB1V0"
+        };
+
+        // Inicializar Firebase y Firestore
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+
+        let currentDate = new Date();
+        let trucksData = {};
+        let monthlyReportRows = [];
+        
+        const defaultFleet = [50, 51, 54, 59, 60, 62, 305, 351, 352, 354, 355, 407, 413, 417, 418, 419];
+        const workHoursOptions = ["Mañana", "Tarde", "Amanecida", "Guardia Chiquita"];
+        const guardiaChiquitaOptions = ["16:00 a 20:00", "6:30 a 14:00", "08:00 a 12:00"];
+
+        const nameCorrections = {
+            "CESAR": "CÉSAR", "MARIA": "MARÍA", "JOSE": "JOSÉ", "ANGEL": "ÁNGEL",
+            "AGUSTIN": "AGUSTÍN", "RAMON": "RAMÓN", "HERNAN": "HERNÁN", "GERMAN": "GERMÁN",
+            "SEBASTIAN": "SEBASTIÁN", "ADRIAN": "ADRIÁN", "RAUL": "RAÚL", "OSCAR": "ÓSCAR",
+            "IVAN": "IVÁN", "VICTOR": "VÍCTOR", "HECTOR": "HÉCTOR", "DARIO": "DARÍO",
+            "ANDRES": "ANDRÉS", "MATIAS": "MATÍAS", "JOAQUIN": "JOAQUÍN", "MARTIN": "MARTÍN",
+            "RUBEN": "RUBÉN", "NESTOR": "NÉSTOR", "EFRAIN": "EFRAÍN", "SANCHEZ": "SÁNCHEZ",
+            "PEREZ": "PÉREZ", "GOMEZ": "GÓMEZ", "LOPEZ": "LÓPEZ", "RODRIGUEZ": "RODRÍGUEZ",
+            "MARTINEZ": "MARTÍNEZ", "GONZALEZ": "GONZÁLEZ", "HERNANDEZ": "HERNÁNDEZ", "DIAZ": "DÍAZ",
+            "VASQUEZ": "VÁSQUEZ", "BENITEZ": "BENÍTEZ", "ALVAREZ": "ÁLVAREZ", "GARCIA": "GARCÍA",
+            "CHAVEZ": "CHÁVEZ", "CARDENAS": "CÁRDENAS", "SUAREZ": "SUÁREZ", "GUTIERREZ": "GUTIÉRREZ",
+            "RAMIREZ": "RAMÍREZ", "NUNEZ": "NÚÑEZ", "RIOS": "RÍOS", "AVILA": "ÁVILA",
+            "CORDOVA": "CÓRDOVA", "VELEZ": "VÉLEZ", "BAJANA": "BAJAÑA"
+        };
+
+        function cleanName(str) {
+            if (!str) return '';
+            let cleaned = str.toUpperCase().trim();
+            cleaned = cleaned.replace(/^[\s.,;:'"-]+|[\s.,;:'"-]+$/g, '');
+            cleaned = cleaned.replace(/\s+/g, ' ');
+            let words = cleaned.split(' ');
+            let correctedWords = words.map(w => {
+                let cleanWord = w.replace(/[.,;:]/g, '');
+                return nameCorrections[cleanWord] || cleanWord;
+            });
+            return correctedWords.join(' ');
+        }
+
+        function isDayUnedited(truckList) {
+            if (!Array.isArray(truckList) || truckList.length === 0) return true;
+            for (let truck of truckList) {
+                if (truck.dispatchedTruck && truck.dispatchedTruck.trim() !== '') return false;
+                if (truck.subHours && truck.subHours.trim() !== '') return false;
+                if (truck.workHours && truck.workHours !== "Mañana") return false;
+                if (!truck.crew) continue;
+                for (let m of truck.crew) {
+                    if (m.status && m.status !== 'Asistencia' && m.status !== 'Asistió') return false;
+                    if (m.detalle && m.detalle.trim() !== '') return false;
+                }
+            }
+            return true;
+        }
+
+        function cleanUnusedDays() {
+            let modified = false;
+            Object.keys(trucksData).forEach(dateKey => {
+                if (isDayUnedited(trucksData[dateKey])) {
+                    delete trucksData[dateKey];
+                    modified = true;
+                }
+            });
+            if (modified) saveToStorage();
+        }
+
+        function sanitizeExistingData() {
+            let modified = false;
+            Object.keys(trucksData).forEach(dateKey => {
+                if (Array.isArray(trucksData[dateKey])) {
+                    trucksData[dateKey].forEach(truck => {
+                        if (truck.crew && Array.isArray(truck.crew)) {
+                            truck.crew.forEach(member => {
+                                if (member.name) {
+                                    const cleaned = cleanName(member.name);
+                                    if (cleaned !== member.name) {
+                                        member.name = cleaned;
+                                        modified = true;
+                                    }
+                                }
+                            });
+                        }
+                    });
+                }
+            });
+            if (modified) saveToStorage();
+        }
+
+        // Modificado para guardar en Firestore estructurado por Día, Mes y Año
+        function saveToStorage() { 
+            localStorage.setItem('cnel_flota_v2', JSON.stringify(trucksData)); 
+            
+            const batch = db.batch();
+            
+            Object.keys(trucksData).forEach(dateKey => {
+                const [anio, mes, dia] = dateKey.split('-');
+                
+                const docRef = db.collection("asistencia_por_dia").doc(dateKey);
+                batch.set(docRef, {
+                    anio: anio,
+                    mes: mes,
+                    dia: dia,
+                    fechaCompleta: dateKey,
+                    flota: trucksData[dateKey]
+                });
+            });
+
+            batch.commit().then(() => {
+                console.log("✅ Registros por día, mes y año guardados exitosamente en Firestore");
+            }).catch((error) => {
+                console.error("❌ Error: No se me guarda en el firestore. Detalle: ", error);
+            });
+        }
+
+        function formatDateKey(date) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
+        function closeModals() { document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active')); }
+        
+        function openAddModal() {
+            document.getElementById('modal-new-id').value = '';
+            document.getElementById('modal-new-dispatched').value = '';
+            document.getElementById('modal-new-observaciones').value = '';
+            document.querySelectorAll('.modal-new-tipo-trabajo').forEach(cb => cb.checked = false);
+            document.getElementById('modal-new-work-hours').value = 'Mañana';
+            toggleGuardiaChiquitaModal();
+            
+            const container = document.getElementById('modal-crew-list-container');
+            container.innerHTML = '';
+            addModalCrewRow('Técnico');
+            addModalCrewRow('Conductor');
+
+            document.getElementById('add-truck-modal').classList.add('active');
+        }
+
+        function addModalCrewRow(defaultRole = 'Técnico') {
+            const container = document.getElementById('modal-crew-list-container');
+            const row = document.createElement('div');
+            row.className = 'modal-crew-row';
+            
+            row.innerHTML = `
+                <div class="modal-crew-row-top">
+                    <input type="text" class="modal-crew-name uppercase-input" list="personnel-suggestions" placeholder="Nombre del trabajador" style="flex:2; padding:6px 8px; border-radius:6px; border:1px solid var(--border); font-size:12px;">
+                    <select class="modal-crew-role" style="flex:1; padding:6px; border-radius:6px; border:1px solid var(--border); font-size:12px; font-weight:600;">
+                        <option value="Técnico" ${defaultRole === 'Técnico' ? 'selected' : ''}>Técnico</option>
+                        <option value="Conductor" ${defaultRole === 'Conductor' ? 'selected' : ''}>Conductor</option>
+                        <option value="Auxiliar" ${defaultRole === 'Auxiliar' ? 'selected' : ''}>Auxiliar / Liniero</option>
+                        <option value="Apoyo" ${defaultRole === 'Apoyo' ? 'selected' : ''}>Apoyo</option>
+                    </select>
+                    <button type="button" class="delete-btn" onclick="this.closest('.modal-crew-row').remove()" title="Quitar persona" style="padding: 4px 8px; font-size: 11px;">🗑️</button>
+                </div>
+                <div class="modal-crew-status-row">
+                    <select class="modal-crew-status" onchange="toggleModalCrewDetalle(this)" style="flex:1; padding:5px; border-radius:6px; border:1px solid var(--border); font-size:11px;">
+                        <option value="Asistencia" selected>✅ Asistencia</option>
+                        <option value="Falta">❌ Falta</option>
+                        <option value="Novedad">⚠️ Novedad</option>
+                    </select>
+                    <input type="text" class="modal-crew-detalle uppercase-input" placeholder="Especifique la novedad..." style="flex:2; display:none; padding:5px; border-radius:6px; border:1px solid var(--warning); font-size:11px; background:#fffbeb;">
+                </div>
+            `;
+            container.appendChild(row);
+        }
+
+        function toggleModalCrewDetalle(selectEl) {
+            const row = selectEl.closest('.modal-crew-row');
+            const detalleInput = row.querySelector('.modal-crew-detalle');
+            if (selectEl.value === 'Novedad') {
+                detalleInput.style.display = 'block';
+            } else {
+                detalleInput.style.display = 'none';
+                detalleInput.value = '';
+            }
+        }
+
+        function toggleGuardiaChiquitaModal() {
+            const val = document.getElementById('modal-new-work-hours').value;
+            const subGroup = document.getElementById('modal-subhours-group');
+            subGroup.style.display = (val === 'Guardia Chiquita') ? 'block' : 'none';
+        }
+
+        function openAddCrewModal(truckIndex) {
+            document.getElementById('modal-crew-truck-index').value = truckIndex;
+            document.getElementById('modal-crew-name').value = '';
+            document.getElementById('modal-crew-status').value = 'Asistencia';
+            document.getElementById('modal-crew-detalle').value = '';
+            document.getElementById('modal-crew-detalle-group').style.display = 'none';
+            document.getElementById('add-crew-modal').classList.add('active');
+        }
+
+        function toggleExtraCrewDetalle() {
+            const val = document.getElementById('modal-crew-status').value;
+            document.getElementById('modal-crew-detalle-group').style.display = (val === 'Novedad') ? 'block' : 'none';
+        }
+
+        function processAddExtraCrew() {
+            const index = document.getElementById('modal-crew-truck-index').value;
+            const rawName = document.getElementById('modal-crew-name').value;
+            const name = cleanName(rawName);
+            const role = document.getElementById('modal-crew-role').value;
+            const status = document.getElementById('modal-crew-status').value;
+            const detalle = status === 'Novedad' ? cleanName(document.getElementById('modal-crew-detalle').value) : '';
+            
+            if(!name) return alert('Por favor, ingresa el nombre del personal.');
+            
+            const dateKey = formatDateKey(currentDate);
+            trucksData[dateKey][index].crew.push({
+                name: name,
+                role: role,
+                status: status,
+                detalle: detalle
+            });
+
+            saveToStorage();
+            closeModals();
+            renderCalendar();
+            renderApp();
+        }
+
+        function deleteCrewMember(date, tIndex, mIndex) {
+            const memberName = trucksData[date][tIndex].crew[mIndex].name;
+            if (confirm(`¿Estás seguro de quitar a "${memberName}" de esta cuadrilla?`)) {
+                trucksData[date][tIndex].crew.splice(mIndex, 1);
+                saveToStorage();
+                renderCalendar();
+                renderApp();
+            }
+        }
+
+        function showPersonnelList(statusType) {
+            const dateKey = formatDateKey(currentDate);
+            const list = trucksData[dateKey] || [];
+            let matches = [];
+
+            list.forEach(truck => {
+                truck.crew.forEach(m => {
+                    if (m.name && cleanName(m.name) !== "SIN ASIGNAR") {
+                        let isMatch = false;
+                        if (statusType === 'Falta' && (m.status === 'Falta' || m.status === 'Faltó')) isMatch = true;
+                        if (statusType === 'Asistencia' && (m.status === 'Asistencia' || m.status === 'Asistió')) isMatch = true;
+                        if (statusType === 'Novedad' && m.status === 'Novedad') isMatch = true;
+                        if (statusType === 'Todos') isMatch = true;
+
+                        if (isMatch) {
+                            matches.push({
+                                name: cleanName(m.name),
+                                role: m.role,
+                                truckId: truck.id,
+                                status: m.status,
+                                detalle: m.detalle || 'Sin detalle'
+                            });
+                        }
+                    }
+                });
+            });
+
+            const titleElem = document.getElementById('personnel-modal-title');
+            const listElem = document.getElementById('personnel-modal-list');
+
+            let titleText = "";
+            if (statusType === 'Falta') titleText = `❌ Personal ausente (${dateKey})`;
+            else if (statusType === 'Asistencia') titleText = `✅ Personal presente (${dateKey})`;
+            else if (statusType === 'Novedad') titleText = `⚠️ Personal con novedades (${dateKey})`;
+            else if (statusType === 'Todos') titleText = `👥 Nómina Completa del Personal (${dateKey})`;
+
+            titleElem.innerText = titleText;
+
+            if (matches.length === 0) {
+                listElem.innerHTML = `<p style="text-align:center; color: gray; margin: 20px 0;">No hay registros para esta categoría.</p>`;
+            } else {
+                let html = `<table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Rol</th>
+                            <th>Cuadrilla</th>
+                            <th>Estado</th>
+                            ${statusType === 'Novedad' || statusType === 'Todos' ? '<th>Detalle Novedad</th>' : ''}
+                        </tr>
+                    </thead>
+                    <tbody>`;
+                
+                matches.forEach(item => {
+                    html += `
+                        <tr>
+                            <td><b>${item.name}</b></td>
+                            <td><span class="role">${item.role}</span></td>
+                            <td><b>Unidad ${item.truckId}</b></td>
+                            <td><span class="status-badge ${item.status === 'Asistencia' || item.status === 'Asistió' ? 'status-ok' : (item.status === 'Falta' ? 'stat-absent' : 'status-warning')}">${item.status}</span></td>
+                            ${statusType === 'Novedad' || statusType === 'Todos' ? `<td style="color:#b45309; font-size:12px;">${item.detalle}</td>` : ''}
+                        </tr>
+                    `;
+                });
+
+                html += `</tbody></table>`;
+                listElem.innerHTML = html;
+            }
+
+            document.getElementById('personnel-detail-modal').classList.add('active');
+        }
+
+        function showSimplifiedSummary() {
+            const dateKey = formatDateKey(currentDate);
+            const list = trucksData[dateKey] || [];
+            const contentDiv = document.getElementById('summary-content');
+            
+            if(list.length === 0) {
+                contentDiv.innerHTML = `<p style="text-align:center; color:gray;">No hay datos registrados para esta fecha.</p>`;
+                document.getElementById('summary-modal').classList.add('active');
+                return;
+            }
+
+            let operativos = 0, presentes = 0, totalPersonal = 0;
+            let countM = 0, countT = 0, countA = 0, countG = 0;
+            let countCuentas = 0, countEmergencia = 0, countTrabajosEj = 0;
+            let alertasHTML = '', tablaHTML = '';
+
+            list.forEach(truck => {
+                let faltasCamion = 0, techName = "SIN ASIGNAR", driverName = "SIN ASIGNAR";
+
+                const wh = truck.workHours || 'Mañana';
+                if(wh === 'Mañana') countM++;
+                else if(wh === 'Tarde') countT++;
+                else if(wh === 'Amanecida') countA++;
+                else if(wh === 'Guardia Chiquita') countG++;
+
+                const tt = truck.tipoTrabajo || [];
+                if(tt.includes('Cuentas')) countCuentas++;
+                if(tt.includes('Emergencia')) countEmergencia++;
+                if(tt.includes('Trabajos Ejecutados')) countTrabajosEj++;
+
+                truck.crew.forEach(m => {
+                    const cName = cleanName(m.name);
+                    if(cName !== "SIN ASIGNAR") {
+                        totalPersonal++;
+                        if(m.status === 'Asistencia' || m.status === 'Asistió') presentes++;
+                        else faltasCamion++;
+                    }
+                    if(m.role === 'Conductor') driverName = cName;
+                    if(m.role === 'Técnico') techName = cName;
+                });
+
+                let estadoClase = faltasCamion === 0 ? 'status-ok' : 'status-warning';
+                let estadoTexto = faltasCamion === 0 ? '🟢 Operativo' : '🟡 Incompleto';
+                let novedadTexto = 'N/A';
+
+                if(faltasCamion > 0) {
+                    let ausentes = truck.crew.filter(m => (m.status !== 'Asistencia' && m.status !== 'Asistió') && cleanName(m.name) !== 'SIN ASIGNAR').map(m => {
+                        const cleanMName = cleanName(m.name);
+                        if(m.status === 'Novedad' && m.detalle) return `${cleanMName} (Novedad: ${m.detalle})`;
+                        return `${cleanMName} (${m.status})`;
+                    });
+                    
+                    if(ausentes.length > 0) {
+                        novedadTexto = ausentes.join(', ');
+                        alertasHTML += `<li><b>Cuadrilla ${truck.id}:</b> ${novedadTexto}</li>`;
+                    }
+                } else operativos++;
+
+                let horarioDisplay = truck.workHours || 'No definido';
+                if(truck.workHours === 'Guardia Chiquita' && truck.subHours) {
+                    horarioDisplay += `<br><small style="color:#b45309; font-weight:bold;">(${truck.subHours})</small>`;
+                }
+
+                tablaHTML += `
+                    <tr>
+                        <td><b>${truck.id}</b></td>
+                        <td>${horarioDisplay}</td>
+                        <td><span class="status-badge ${estadoClase}">${estadoTexto}</span></td>
+                        <td>${techName}</td>
+                        <td>${driverName}</td>
+                        <td style="color:var(--danger); font-size:11px;">${novedadTexto !== 'N/A' ? novedadTexto : ''}</td>
+                    </tr>
+                `;
+            });
+
+            let alertasSeccion = alertasHTML !== '' ? `
+                <div class="alerts-box">
+                    <h4>⚠️ Alertas y Novedades del Personal:</h4>
+                    <ul>${alertasHTML}</ul>
+                </div>` : '';
+
+            contentDiv.innerHTML = `
+                <div class="summary-kpi-container">
+                    <div class="kpi-card"><span>Total Personal</span><b>${totalPersonal}</b></div>
+                    <div class="kpi-card"><span>Cuadrillas Totales</span><b>${list.length}</b></div>
+                    <div class="kpi-card"><span>Personal Presente</span><b style="color:var(--primary)">${presentes} / ${totalPersonal}</b></div>
+                    <div class="kpi-card"><span>Unidades c/ Novedad</span><b style="color:var(--danger)">${list.length - operativos}</b></div>
+                </div>
+
+                <div style="background: #f1f5f9; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; text-align: center;">
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">☀️ Mañana</span><br><b style="font-size:16px;">${countM}</b></div>
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">⛅ Tarde</span><br><b style="font-size:16px;">${countT}</b></div>
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">🌙 Amanecida</span><br><b style="font-size:16px;">${countA}</b></div>
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">⏰ G. Chiquita</span><br><b style="font-size:16px;">${countG}</b></div>
+                </div>
+
+                <div style="background: #f1f5f9; border: 1px solid var(--border); border-radius: 10px; padding: 10px 14px; margin-bottom: 16px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; text-align: center;">
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">📋 Cuentas</span><br><b style="font-size:16px;">${countCuentas}</b></div>
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">🚨 Emergencia</span><br><b style="font-size:16px; color:var(--danger);">${countEmergencia}</b></div>
+                    <div><span style="font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase;">✅ Trabajos Ejecutados</span><br><b style="font-size:16px; color:var(--success);">${countTrabajosEj}</b></div>
+                </div>
+
+                ${alertasSeccion}
+                <table class="summary-table">
+                    <thead>
+                        <tr>
+                            <th>Cuadrilla</th>
+                            <th>Horario</th>
+                            <th>Estado</th>
+                            <th>Técnico (T1)</th>
+                            <th>Conductor (C)</th>
+                            <th>Observación</th>
+                        </tr>
+                    </thead>
+                    <tbody>${tablaHTML}</tbody>
+                </table>
+            `;
+            document.getElementById('summary-modal').classList.add('active');
+        }
+
+        function showMonthlyReport() {
+            const m = parseInt(document.getElementById('select-month').value);
+            const y = parseInt(document.getElementById('select-year').value);
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+            document.getElementById('monthly-modal-title').innerText = `REPORTE CONSOLIDADO - ${monthNames[m].toUpperCase()} ${y}`;
+            document.getElementById('monthly-search-input').value = '';
+
+            const personStats = {};
+            let totalDaysRecorded = 0;
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                if (trucksData[dateKey] && trucksData[dateKey].length > 0) {
+                    totalDaysRecorded++;
+                    trucksData[dateKey].forEach(truck => {
+                        truck.crew.forEach(member => {
+                            const cleanMemberName = cleanName(member.name);
+                            if (cleanMemberName && cleanMemberName !== "SIN ASIGNAR") {
+                                const nameKey = cleanMemberName;
+                                if (!personStats[nameKey]) {
+                                    personStats[nameKey] = { present: 0, absent: 0, novelty: 0, details: [], roles: new Set(), trucks: new Set() };
+                                }
+                                if (member.role) personStats[nameKey].roles.add(member.role);
+                                if (truck.id !== undefined && truck.id !== null && truck.id !== '') personStats[nameKey].trucks.add(String(truck.id));
+                                if (member.status === 'Asistencia' || member.status === 'Asistió') {
+                                    personStats[nameKey].present++;
+                                } else if (member.status === 'Falta' || member.status === 'Faltó') {
+                                    personStats[nameKey].absent++;
+                                    personStats[nameKey].details.push(`Día ${d}: Falta`);
+                                } else if (member.status === 'Novedad') {
+                                    personStats[nameKey].novelty++;
+                                    personStats[nameKey].details.push(`Día ${d}: Novedad (${member.detalle || 'Sin detalle'})`);
+                                }
+                            }
+                        });
+                    });
+                }
+            }
+
+            const names = Object.keys(personStats);
+            const contentDiv = document.getElementById('monthly-content');
+            const roleFilterEl = document.getElementById('monthly-filter-role');
+            const truckFilterEl = document.getElementById('monthly-filter-truck');
+
+            if (names.length === 0 || totalDaysRecorded === 0) {
+                monthlyReportRows = [];
+                roleFilterEl.innerHTML = '<option value="all">Todos los cargos</option>';
+                truckFilterEl.innerHTML = '<option value="all">Todas las unidades</option>';
+                document.getElementById('monthly-count-note').innerText = '';
+                contentDiv.innerHTML = `<p style="text-align:center; color:gray; padding:20px;">No hay registros de asistencia en el mes de ${monthNames[m]} de ${y}.</p>`;
+                document.getElementById('monthly-modal').classList.add('active');
+                return;
+            }
+
+            let totalPresentMonth = 0, totalAbsentMonth = 0, totalNoveltyMonth = 0;
+            const allRoles = new Set();
+            const allTrucks = new Set();
+
+            monthlyReportRows = names.sort().map(name => {
+                const p = personStats[name];
+                totalPresentMonth += p.present;
+                totalAbsentMonth += p.absent;
+                totalNoveltyMonth += p.novelty;
+
+                const totalWorkedDays = p.present + p.absent + p.novelty;
+                const pct = totalWorkedDays > 0 ? Math.round((p.present / totalWorkedDays) * 100) : 0;
+                const roles = Array.from(p.roles).sort();
+                const trucks = Array.from(p.trucks);
+                roles.forEach(r => allRoles.add(r));
+                trucks.forEach(t => allTrucks.add(t));
+
+                return {
+                    name, roles, trucks,
+                    present: p.present, absent: p.absent, novelty: p.novelty,
+                    pct,
+                    details: p.details.length > 0 ? p.details.join(' | ') : 'Sin observaciones'
+                };
+            });
+
+            roleFilterEl.innerHTML = '<option value="all">Todos los cargos</option>' +
+                Array.from(allRoles).sort().map(r => `<option value="${r}">${r}</option>`).join('');
+            truckFilterEl.innerHTML = '<option value="all">Todas las unidades</option>' +
+                Array.from(allTrucks).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).map(t => `<option value="${t}">Unidad ${t}</option>`).join('');
+            document.getElementById('monthly-sort').value = 'worst';
+
+            contentDiv.innerHTML = `
+                <div class="summary-kpi-container">
+                    <div class="kpi-card"><span>Días Guardados</span><b>${totalDaysRecorded} días</b></div>
+                    <div class="kpi-card"><span>Personal Evaluado</span><b>${names.length} pers.</b></div>
+                    <div class="kpi-card"><span>Total Faltas Mes</span><b style="color:var(--danger)">${totalAbsentMonth}</b></div>
+                    <div class="kpi-card"><span>Total Novedades</span><b style="color:var(--warning)">${totalNoveltyMonth}</b></div>
+                </div>
+                <table class="summary-table" id="monthly-table">
+                    <thead>
+                        <tr>
+                            <th>Colaborador</th>
+                            <th style="text-align:center;">Asistencias</th>
+                            <th style="text-align:center;">Faltas</th>
+                            <th style="text-align:center;">Novedades</th>
+                            <th style="text-align:center;">% Asist.</th>
+                            <th>Observaciones del Mes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monthly-table-body"></tbody>
+                </table>
+            `;
+
+            renderMonthlyTable();
+            document.getElementById('monthly-modal').classList.add('active');
+        }
+
+        function renderMonthlyTable() {
+            const bodyEl = document.getElementById('monthly-table-body');
+            if (!bodyEl) return;
+
+            const query = cleanName(document.getElementById('monthly-search-input').value);
+            const roleFilter = document.getElementById('monthly-filter-role').value;
+            const truckFilter = document.getElementById('monthly-filter-truck').value;
+            const sortBy = document.getElementById('monthly-sort').value;
+
+            let rows = monthlyReportRows.filter(r => {
+                if (query && !cleanName(r.name).includes(query)) return false;
+                if (roleFilter !== 'all' && !r.roles.includes(roleFilter)) return false;
+                if (truckFilter !== 'all' && !r.trucks.includes(truckFilter)) return false;
+                return true;
+            });
+
+            rows = rows.slice().sort((a, b) => {
+                if (sortBy === 'worst') return (a.pct - b.pct) || (b.absent - a.absent) || a.name.localeCompare(b.name);
+                if (sortBy === 'best') return (b.pct - a.pct) || a.name.localeCompare(b.name);
+                if (sortBy === 'absences') return (b.absent - a.absent) || (a.pct - b.pct) || a.name.localeCompare(b.name);
+                return a.name.localeCompare(b.name);
+            });
+
+            bodyEl.innerHTML = rows.map(r => {
+                let rowClass = 'monthly-row-item';
+                let alertIcon = '';
+                if (r.pct < 70) { rowClass += ' row-critical'; alertIcon = '<span class="alert-icon">🔴</span>'; }
+                else if (r.pct < 90) { rowClass += ' row-warning'; alertIcon = '<span class="alert-icon">🟡</span>'; }
+
+                return `
+                    <tr class="${rowClass}">
+                        <td class="person-name">${alertIcon}<b>${r.name}</b><br><span style="font-size:10px; color:var(--text-muted); font-weight:400;">${r.roles.join(', ') || '—'}</span></td>
+                        <td style="text-align:center;"><span class="badge-count badge-present">${r.present}</span></td>
+                        <td style="text-align:center;"><span class="badge-count badge-absent" title="${r.details}">${r.absent}</span></td>
+                        <td style="text-align:center;"><span class="badge-count badge-novelty" title="${r.details}">${r.novelty}</span></td>
+                        <td style="text-align:center;"><b>${r.pct}%</b></td>
+                        <td style="font-size:11px; color:var(--text-muted); max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${r.details}">${r.details}</td>
+                    </tr>
+                `;
+            }).join('');
+
+            const noteEl = document.getElementById('monthly-count-note');
+            if (noteEl) noteEl.innerText = `Mostrando ${rows.length} de ${monthlyReportRows.length} colaboradores`;
+        }
+
+        function shiftInfo(workHours) {
+            if (workHours === 'Mañana') return { code: 'M', cls: 'shift-cell-manana' };
+            if (workHours === 'Tarde') return { code: 'T', cls: 'shift-cell-tarde' };
+            if (workHours === 'Amanecida') return { code: 'A', cls: 'shift-cell-amanecida' };
+            if (workHours === 'Guardia Chiquita') return { code: 'GCh', cls: 'shift-cell-guardia' };
+            return { code: '—', cls: 'shift-cell-empty' };
+        }
+
+        function showScheduleReport() {
+            const m = parseInt(document.getElementById('select-month').value);
+            const y = parseInt(document.getElementById('select-year').value);
+            const monthNames = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+
+            document.getElementById('schedule-modal-title').innerText = `HORARIOS TRABAJADOS - ${monthNames[m].toUpperCase()} ${y}`;
+
+            const daysInMonth = new Date(y, m + 1, 0).getDate();
+            const grid = {};
+            let anyData = false;
+
+            for (let d = 1; d <= daysInMonth; d++) {
+                const dateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const list = trucksData[dateKey];
+                if (list && list.length > 0) {
+                    anyData = true;
+                    list.forEach(truck => {
+                        const id = String(truck.id);
+                        if (!grid[id]) grid[id] = {};
+                        grid[id][d] = { wh: truck.workHours || 'Mañana', sh: truck.subHours || '' };
+                    });
+                }
+            }
+
+            const contentDiv = document.getElementById('schedule-content');
+            const ids = Object.keys(grid).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+
+            if (!anyData || ids.length === 0) {
+                contentDiv.innerHTML = `<p style="text-align:center; color:gray; padding:20px;">No hay registros de horarios en el mes de ${monthNames[m]} de ${y}.</p>`;
+                document.getElementById('schedule-modal').classList.add('active');
+                return;
+            }
+
+            let headerCells = '';
+            for (let d = 1; d <= daysInMonth; d++) {
+                headerCells += `<th>${d}</th>`;
+            }
+
+            let rowsHTML = ids.map(id => {
+                let cells = '';
+                for (let d = 1; d <= daysInMonth; d++) {
+                    const entry = grid[id][d];
+                    if (entry) {
+                        const info = shiftInfo(entry.wh);
+                        const title = entry.wh + (entry.sh ? ' (' + entry.sh + ')' : '');
+                        cells += `<td class="${info.cls}" title="${title}">${info.code}</td>`;
+                    } else {
+                        cells += `<td class="shift-cell-empty">—</td>`;
+                    }
+                }
+                return `<tr><td class="schedule-name-col">Unidad ${id}</td>${cells}</tr>`;
+            }).join('');
+
+            contentDiv.innerHTML = `
+                <div class="schedule-scroll">
+                    <table class="schedule-table">
+                        <thead>
+                            <tr><th class="schedule-name-col">Cuadrilla</th>${headerCells}</tr>
+                        </thead>
+                        <tbody>${rowsHTML}</tbody>
+                    </table>
+                </div>
+            `;
+
+            document.getElementById('schedule-modal').classList.add('active');
+        }
+
+        function loadDefaultFleetForDay(dateKey) {
+            trucksData[dateKey] = defaultFleet.map(id => {
+                let driverName = "SIN ASIGNAR", techName = "SIN ASIGNAR";
+                if (id === 305) { driverName = "CÉSAR BAJAÑA"; techName = "JORGE SÁNCHEZ"; }
+                return {
+                    id: id.toString(), workHours: "Mañana", subHours: "", dispatchedTruck: "", observaciones: "", tipoTrabajo: [],
+                    crew: [
+                        { name: techName, role: 'Técnico', status: 'Asistencia', detalle: '' },
+                        { name: driverName, role: 'Conductor', status: 'Asistencia', detalle: '' }
+                    ]
+                };
+            });
+            saveToStorage();
+            renderCalendar();
+            renderApp();
+        }
+
+        function renderApp() {
+            const dateKey = formatDateKey(currentDate);
+            document.getElementById('display-date-stat').innerText = dateKey;
+
+            const list = trucksData[dateKey] || [];
+            const container = document.getElementById('truck-container');
+            container.innerHTML = '';
+
+            if (list.length === 0) {
+                document.getElementById('display-total-trucks').innerText = 0;
+                document.getElementById('display-total-personnel').innerText = 0;
+                document.getElementById('display-total-present').innerText = 0;
+                document.getElementById('display-total-absent').innerText = 0;
+                document.getElementById('display-total-novelties').innerText = 0;
+
+                document.getElementById('count-manana').innerText = 0;
+                document.getElementById('count-tarde').innerText = 0;
+                document.getElementById('count-amanecida').innerText = 0;
+                document.getElementById('count-g-chiquita').innerText = 0;
+
+                container.innerHTML = `
+                    <div style="grid-column: 1 / -1; text-align: center; padding: 50px 20px; background: #ffffff; border-radius: 12px; border: 2px dashed var(--border); margin-top: 10px;">
+                        <p style="font-size: 16px; color: var(--text-muted); font-weight: 600; margin-bottom: 20px;">
+                            📅 No hay información ni cuadrillas registradas para el <span style="color: var(--primary);">${dateKey}</span>.
+                        </p>
+                        <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+                            <button class="btn-action" style="background: var(--success); max-width: 220px;" onclick="openAddModal()">⚡ Agregar Cuadrilla</button>
+                            <button class="btn-action" style="background: var(--primary); max-width: 270px;" onclick="loadDefaultFleetForDay('${dateKey}')">📋 Cargar Flota Base (16 Cuadrillas)</button>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            let totalPersonnel = 0, totalPresent = 0, totalAbsent = 0, totalNovelties = 0;
+            let countManana = 0, countTarde = 0, countAmanecida = 0, countGChiquita = 0;
+
+            list.forEach(truck => {
+                const wh = truck.workHours || 'Mañana';
+                if (wh === 'Mañana') countManana++;
+                else if (wh === 'Tarde') countTarde++;
+                else if (wh === 'Amanecida') countAmanecida++;
+                else if (wh === 'Guardia Chiquita') countGChiquita++;
+
+                truck.crew.forEach(member => {
+                    const cName = cleanName(member.name);
+                    if (cName && cName !== "SIN ASIGNAR") {
+                        totalPersonnel++;
+                        if (member.status === 'Asistencia' || member.status === 'Asistió') totalPresent++;
+                        else if (member.status === 'Falta' || member.status === 'Faltó') totalAbsent++;
+                        else if (member.status === 'Novedad') totalNovelties++;
+                    }
+                });
+            });
+
+            document.getElementById('display-total-trucks').innerText = list.length;
+            document.getElementById('display-total-personnel').innerText = totalPersonnel;
+            document.getElementById('display-total-present').innerText = totalPresent;
+            document.getElementById('display-total-absent').innerText = totalAbsent;
+            document.getElementById('display-total-novelties').innerText = totalNovelties;
+
+            document.getElementById('count-manana').innerText = countManana;
+            document.getElementById('count-tarde').innerText = countTarde;
+            document.getElementById('count-amanecida').innerText = countAmanecida;
+            document.getElementById('count-g-chiquita').innerText = countGChiquita;
+
+            list.forEach((truck, index) => {
+                const card = document.createElement('div');
+                card.className = 'truck-card';
+                
+                let hoursOptionsHTML = workHoursOptions.map(h => 
+                    `<option value="${h}" ${truck.workHours === h ? 'selected' : ''}>${h}</option>`
+                ).join('');
+
+                let subHoursHTML = '';
+                if (truck.workHours === 'Guardia Chiquita') {
+                    let subOptionsHTML = guardiaChiquitaOptions.map(sh => 
+                        `<option value="${sh}" ${truck.subHours === sh ? 'selected' : ''}>${sh}</option>`
+                    ).join('');
+
+                    subHoursHTML = `
+                        <div class="truck-config-row" style="background: #fffbeb; border-color: #fcd34d;">
+                            <label style="color: #b45309;">Turno G. Chiquita:</label>
+                            <select onchange="updateSubHours('${dateKey}', ${index}, this.value)">
+                                ${subOptionsHTML}
+                            </select>
+                        </div>
+                    `;
+                }
+
+                let crewHTML = truck.crew.map((member, mIndex) => {
+                    const displayName = cleanName(member.name);
+                    return `
+                    <div class="crew-member-row" style="display:flex; flex-direction:column; gap: 6px;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap: 6px;">
+                            <div style="display:flex; align-items:center; gap: 6px; flex-wrap: wrap;">
+                                <span class="crew-name" style="${displayName === 'SIN ASIGNAR' ? 'color:gray; font-style:italic;' : ''}">${displayName}</span>
+                                <span class="role">${member.role}</span>
+                            </div>
+                            <div style="display:flex; align-items:center; gap: 6px;">
+                                <select onchange="updateStatus('${dateKey}', ${index}, ${mIndex}, this.value)" style="padding:3px 5px; font-size:11px; border-radius:4px; border:1px solid var(--border);" ${displayName === 'SIN ASIGNAR' ? 'disabled' : ''}>
+                                    <option value="Asistencia" ${member.status === 'Asistencia' || member.status === 'Asistió' ? 'selected' : ''}>Asistencia</option>
+                                    <option value="Falta" ${member.status === 'Falta' || member.status === 'Faltó' ? 'selected' : ''}>Falta</option>
+                                    <option value="Novedad" ${member.status === 'Novedad' ? 'selected' : ''}>Novedad</option>
+                                </select>
+                                <button class="delete-btn" style="padding: 2px 6px; font-size: 11px;" title="Eliminar este trabajador" onclick="deleteCrewMember('${dateKey}', ${index}, ${mIndex})">🗑️</button>
+                            </div>
+                        </div>
+                        ${member.status === 'Novedad' ? `
+                            <input type="text" placeholder="Especifique la novedad (Ej. Permiso médico)" 
+                                   value="${member.detalle || ''}" 
+                                   oninput="updateDetalle('${dateKey}', ${index}, ${mIndex}, this.value)" 
+                                   style="font-size:11px; padding:5px; border:1px solid var(--warning); border-radius:4px; width:100%; background:#fffbeb;"
+                                   class="uppercase-input">
+                        ` : ''}
+                    </div>
+                    `;
+                }).join('');
+
+                card.innerHTML = `
+                    <div class="truck-header">
+                        <h2>🚚 Unidad ${truck.id}</h2>
+                        <button class="delete-btn" onclick="deleteTruck('${dateKey}', ${index})">Eliminar</button>
+                    </div>
+                    <div class="truck-config-row">
+                        <label>Horario Laboral:</label>
+                        <select onchange="updateWorkHours('${dateKey}', ${index}, this.value)">${hoursOptionsHTML}</select>
+                    </div>
+                    ${subHoursHTML}
+                    <div class="truck-config-row">
+                        <label>Salieron en:</label>
+                        <input type="text" class="uppercase-input" value="${truck.dispatchedTruck || ''}" oninput="updateDispatched('${dateKey}', ${index}, this.value)" style="width: 100px;">
+                    </div>
+                    <div class="truck-obs-row">
+                        <label>📝 Observaciones:</label>
+                        <textarea placeholder="Escribe alguna observación sobre este camión..." oninput="updateObservaciones('${dateKey}', ${index}, this.value)">${truck.observaciones || ''}</textarea>
+                    </div>
+                    <div class="truck-obs-row">
+                        <label>🗂️ Tipo de Trabajo:</label>
+                        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+                            <label style="display:flex; align-items:center; gap:5px; font-weight:600; font-size:11px; color:var(--text-main); text-transform:none; cursor:pointer;">
+                                <input type="checkbox" ${(truck.tipoTrabajo || []).includes('Cuentas') ? 'checked' : ''} onchange="updateTipoTrabajo('${dateKey}', ${index}, 'Cuentas', this.checked)"> Cuentas
+                            </label>
+                            <label style="display:flex; align-items:center; gap:5px; font-weight:600; font-size:11px; color:var(--text-main); text-transform:none; cursor:pointer;">
+                                <input type="checkbox" ${(truck.tipoTrabajo || []).includes('Emergencia') ? 'checked' : ''} onchange="updateTipoTrabajo('${dateKey}', ${index}, 'Emergencia', this.checked)"> Emergencia
+                            </label>
+                            <label style="display:flex; align-items:center; gap:5px; font-weight:600; font-size:11px; color:var(--text-main); text-transform:none; cursor:pointer;">
+                                <input type="checkbox" ${(truck.tipoTrabajo || []).includes('Trabajos Ejecutados') ? 'checked' : ''} onchange="updateTipoTrabajo('${dateKey}', ${index}, 'Trabajos Ejecutados', this.checked)"> Trabajos Ejecutados
+                            </label>
+                        </div>
+                    </div>
+                    <div style="font-size:11px; font-weight:700; margin:8px 0 4px 0;">👥 CUADRILLA:</div>
+                    <div class="crew-list">${crewHTML}</div>
+                    <button class="btn-add-crew" onclick="openAddCrewModal(${index})">➕ Agregar Integrante</button>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function processNewTruck() {
+            const id = document.getElementById('modal-new-id').value;
+            if(!id) return alert('El número de cuadrilla es obligatorio.');
+            
+            const dateKey = formatDateKey(currentDate);
+            if(!trucksData[dateKey]) trucksData[dateKey] = [];
+
+            const workHours = document.getElementById('modal-new-work-hours').value;
+            const subHours = workHours === 'Guardia Chiquita' ? document.getElementById('modal-new-subhours').value : '';
+            const dispatched = cleanName(document.getElementById('modal-new-dispatched').value);
+            const observaciones = document.getElementById('modal-new-observaciones').value.trim();
+            const tipoTrabajo = Array.from(document.querySelectorAll('.modal-new-tipo-trabajo:checked')).map(cb => cb.value);
+
+            const crewRows = document.querySelectorAll('#modal-crew-list-container .modal-crew-row');
+            const crew = [];
+
+            crewRows.forEach(row => {
+                const nameVal = row.querySelector('.modal-crew-name').value;
+                const roleVal = row.querySelector('.modal-crew-role').value;
+                const statusVal = row.querySelector('.modal-crew-status').value;
+                const detalleVal = row.querySelector('.modal-crew-detalle').value;
+                const clean = cleanName(nameVal);
+
+                if (clean) {
+                    crew.push({ name: clean, role: roleVal, status: statusVal, detalle: statusVal === 'Novedad' ? cleanName(detalleVal) : '' });
+                }
+            });
+
+            if (crew.length === 0) {
+                crew.push(
+                    { name: 'SIN ASIGNAR', role: 'Técnico', status: 'Asistencia', detalle: '' },
+                    { name: 'SIN ASIGNAR', role: 'Conductor', status: 'Asistencia', detalle: '' }
+                );
+            }
+
+            trucksData[dateKey].push({
+                id: id, workHours: workHours, subHours: subHours, dispatchedTruck: dispatched, observaciones: observaciones, tipoTrabajo: tipoTrabajo, crew: crew
+            });
+
+            saveToStorage(); 
+            closeModals(); 
+            renderCalendar();
+            renderApp();
+        }
+
+        function updateWorkHours(date, tIndex, val) { 
+            trucksData[date][tIndex].workHours = val; 
+            if(val === 'Guardia Chiquita') trucksData[date][tIndex].subHours = guardiaChiquitaOptions[0];
+            else trucksData[date][tIndex].subHours = '';
+            saveToStorage(); 
+            renderApp();
+        }
+
+        function updateSubHours(date, tIndex, val) { trucksData[date][tIndex].subHours = val; saveToStorage(); }
+        function updateDispatched(date, tIndex, val) { trucksData[date][tIndex].dispatchedTruck = cleanName(val); saveToStorage(); }
+        function updateObservaciones(date, tIndex, val) { trucksData[date][tIndex].observaciones = val; saveToStorage(); }
+        function updateTipoTrabajo(date, tIndex, tipo, checked) {
+            const truck = trucksData[date][tIndex];
+            if (!truck.tipoTrabajo) truck.tipoTrabajo = [];
+            if (checked) {
+                if (!truck.tipoTrabajo.includes(tipo)) truck.tipoTrabajo.push(tipo);
+            } else {
+                truck.tipoTrabajo = truck.tipoTrabajo.filter(t => t !== tipo);
+            }
+            saveToStorage();
+        }
+        function updateStatus(date, tIndex, mIndex, val) { 
+            trucksData[date][tIndex].crew[mIndex].status = val; 
+            if(val !== 'Novedad') trucksData[date][tIndex].crew[mIndex].detalle = ''; 
+            saveToStorage(); renderApp(); 
+        }
+        function updateDetalle(date, tIndex, mIndex, val) { trucksData[date][tIndex].crew[mIndex].detalle = cleanName(val); saveToStorage(); }
+        function deleteTruck(date, index) { 
+            if(confirm("¿Estás seguro de eliminar esta cuadrilla y todo su personal asignado?")) {
+                trucksData[date].splice(index, 1); 
+                if(trucksData[date].length === 0) delete trucksData[date];
+                saveToStorage(); 
+                renderCalendar();
+                renderApp(); 
+            }
+        }
+
+        function initCalendar() {
+            const ys = document.getElementById('select-year');
+            const cy = new Date().getFullYear();
+            for(let y = cy - 5; y <= cy + 5; y++) ys.innerHTML += `<option value="${y}" ${y===cy?'selected':''}>${y}</option>`;
+            document.getElementById('select-month').value = new Date().getMonth();
+            renderCalendar();
+        }
+
+        function renderCalendar() {
+            const m = parseInt(document.getElementById('select-month').value);
+            const y = parseInt(document.getElementById('select-year').value);
+            const grid = document.getElementById('calendar-days-grid');
+            grid.innerHTML = '<div>Lu</div><div>Ma</div><div>Mi</div><div>Ju</div><div>Vi</div><div>Sá</div><div>Do</div>';
+            
+            let firstDay = new Date(y, m, 1).getDay() - 1;
+            if(firstDay === -1) firstDay = 6;
+            const days = new Date(y, m + 1, 0).getDate();
+
+            for(let i=0; i<firstDay; i++) grid.innerHTML += '<div></div>';
+            for(let d=1; d<=days; d++) {
+                let cell = document.createElement('div');
+                cell.className = 'calendar-cell';
+                cell.innerText = d;
+                
+                const cellDateKey = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                
+                if (trucksData[cellDateKey] && trucksData[cellDateKey].length > 0) {
+                    cell.classList.add('has-data');
+                }
+
+                if(d === currentDate.getDate() && m === currentDate.getMonth() && y === currentDate.getFullYear()) cell.classList.add('selected');
+                
+                cell.onclick = () => { currentDate = new Date(y, m, d); renderCalendar(); renderApp(); };
+                grid.appendChild(cell);
+            }
+        }
+
+        function onMonthYearChange() { currentDate = new Date(document.getElementById('select-year').value, document.getElementById('select-month').value, 1); renderCalendar(); renderApp(); }
+        function changeMonth(dir) { currentDate.setMonth(currentDate.getMonth() + dir); document.getElementById('select-month').value = currentDate.getMonth(); document.getElementById('select-year').value = currentDate.getFullYear(); renderCalendar(); renderApp(); }
+
+        function exportData() {
+            sanitizeExistingData();
+            const dataStr = JSON.stringify(trucksData, null, 2);
+            const blob = new Blob([dataStr], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `CNEL_Respaldo_Flota_${formatDateKey(new Date())}.json`;
+            a.click(); URL.revokeObjectURL(url);
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedData = JSON.parse(e.target.result);
+                    if (typeof importedData === 'object' && importedData !== null) {
+                        trucksData = importedData; 
+                        sanitizeExistingData(); 
+                        cleanUnusedDays();
+                        renderCalendar();
+                        renderApp(); 
+                        alert("✅ ¡Datos cargados exitosamente!");
+                    } else alert("⚠️ El archivo no tiene el formato correcto.");
+                } catch (error) { alert("❌ Error al leer el archivo JSON."); }
+                event.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
+
+        // Carga asíncrona adaptada para recuperar los documentos organizados por fecha desde Firestore
+        async function inicializarAppConFirebase() {
+            try {
+                trucksData = {};
+                const querySnapshot = await db.collection("asistencia_por_dia").get();
+                
+                if (!querySnapshot.empty) {
+                    querySnapshot.forEach((doc) => {
+                        const data = doc.data();
+                        if (data.fechaCompleta && data.flota) {
+                            trucksData[data.fechaCompleta] = data.flota;
+                        }
+                    });
+                    console.log("✅ Flota cargada desde la nube de Firestore (organizada por Día/Mes/Año).");
+                } else {
+                    trucksData = JSON.parse(localStorage.getItem('cnel_flota_v2')) || {};
+                    console.log("⚠️ No se encontró datos en la nube. Cargando del localStorage.");
+                }
+            } catch (error) {
+                console.error("❌ Error de conexión con Firebase. Usando respaldo local.", error);
+                trucksData = JSON.parse(localStorage.getItem('cnel_flota_v2')) || {};
+            }
+
+            sanitizeExistingData();
+            cleanUnusedDays();
+            initCalendar(); 
+            renderApp();
+        }
+
+        // Arrancar la aplicación
+        inicializarAppConFirebase();
+    </script>
+</body>
+</html>
