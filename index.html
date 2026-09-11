@@ -6,8 +6,9 @@
     <title>Control y Asistencia | CNEL EP</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Firebase App & Firestore SDK (Versión Compat para mantener compatibilidad con eventos inline) -->
+    <!-- Firebase App, Auth & Firestore SDK (Versión Compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
@@ -36,6 +37,104 @@
             color: var(--text-main);
             margin: 0;
             padding: 0;
+        }
+
+        /* Pantalla de Login de Google */
+        #login-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, var(--secondary) 0%, #1e293b 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            transition: opacity 0.3s ease;
+        }
+
+        .login-card {
+            background: var(--card-bg);
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            text-align: center;
+            width: 90%;
+            max-width: 400px;
+            border-top: 5px solid var(--primary);
+        }
+
+        .login-card h2 {
+            margin-top: 0;
+            color: var(--secondary);
+            font-size: 20px;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .login-card p {
+            color: var(--text-muted);
+            font-size: 13px;
+            margin-bottom: 24px;
+        }
+
+        .btn-google {
+            background: #ffffff;
+            color: #334155;
+            border: 1px solid var(--border);
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            width: 100%;
+            box-shadow: var(--shadow-sm);
+            transition: background 0.2s, transform 0.1s;
+        }
+
+        .btn-google:hover {
+            background: #f1f5f9;
+            transform: translateY(-1px);
+        }
+
+        .btn-google svg {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* Botón de cerrar sesión en el header */
+        .user-profile-box {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-email {
+            font-size: 12px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        .btn-logout {
+            background: rgba(239, 68, 68, 0.15);
+            color: #fca5a5;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-logout:hover {
+            background: rgba(239, 68, 68, 0.3);
+            color: #ffffff;
         }
 
         header {
@@ -417,6 +516,23 @@
 </head>
 <body>
 
+    <!-- Pantalla de Login con Google -->
+    <div id="login-screen">
+        <div class="login-card">
+            <h2>Control y Asistencia</h2>
+            <p>CNEL EP - Redes de Distribución</p>
+            <button class="btn-google" onclick="loginWithGoogle()">
+                <svg viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.13 0-5.78-2.11-6.73-4.96H1.2v3.15C3.18 21.35 7.27 24 12 24z"/>
+                    <path fill="#FBBC05" d="M5.27 14.24c-.25-.72-.38-1.49-.38-2.24s.13-1.52.38-2.24V6.6H1.2C.44 8.14 0 9.89 0 12s.44 3.86 1.2 5.4l4.07-3.16z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.27 0 3.18 2.65 1.2 6.6l4.07 3.15c.95-2.85 3.6-4.96 6.73-4.96z"/>
+                </svg>
+                Iniciar sesión con Google
+            </button>
+        </div>
+    </div>
+
     <datalist id="personnel-suggestions">
         <option value="ABEL NAVARRETE"></option>
         <option value="ALEX GOMEZ"></option>
@@ -524,7 +640,10 @@
             </div>
             <h1>CONTROL Y ASISTENCIA DE LAS CUADRILLAS/CNEL +</h1>
         </div>
-        <div style="font-size: 13px; font-weight: 500; color: #94a3b8;">REDES DE DISTRIBUCIÓN</div>
+        <div class="user-profile-box">
+            <span id="user-email-display" class="user-email"></span>
+            <button class="btn-logout" onclick="logoutSession()">Cerrar Sesión</button>
+        </div>
     </header>
 
     <div class="dashboard-stats">
@@ -807,7 +926,7 @@
     </div>
 
     <script>
-        // Configuración de Firebase Cloud Firestore
+        // Configuración de Firebase Cloud Firestore y Auth
         const firebaseConfig = {
             apiKey: "AIzaSyAJNKZTogktnLFVuiLhlFcfTKrs-PRB0SA",
             authDomain: "operaciones-da574.firebaseapp.com",
@@ -818,8 +937,9 @@
             measurementId: "G-D9349LB1V0"
         };
 
-        // Inicializar Firebase y Firestore
+        // Inicializar Firebase, Auth y Firestore
         firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
         const db = firebase.firestore();
 
         let currentDate = new Date();
@@ -906,7 +1026,7 @@
             if (modified) saveToStorage();
         }
 
-        // Modificado para guardar en Firestore estructurado por Día, Mes y Año
+        // Guardar estructurado por Día, Mes y Año en Firestore
         function saveToStorage() { 
             localStorage.setItem('cnel_flota_v2', JSON.stringify(trucksData)); 
             
@@ -1799,8 +1919,25 @@
             reader.readAsText(file);
         }
 
-        // Carga asíncrona adaptada para recuperar los documentos organizados por fecha desde Firestore
-        async function inicializarAppConFirebase() {
+        // Funciones de Autenticación con Google
+        function loginWithGoogle() {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            auth.signInWithPopup(provider).catch((error) => {
+                console.error("❌ Error en autenticación con Google: ", error);
+                alert("Hubo un error al iniciar sesión con Google.");
+            });
+        }
+
+        function logoutSession() {
+            auth.signOut().then(() => {
+                console.log("Sesión cerrada");
+            }).catch((error) => {
+                console.error("Error al cerrar sesión", error);
+            });
+        }
+
+        // Carga de datos desde Firestore una vez autenticado
+        async function cargarDatosNube() {
             try {
                 trucksData = {};
                 const querySnapshot = await db.collection("asistencia_por_dia").get();
@@ -1828,8 +1965,23 @@
             renderApp();
         }
 
-        // Arrancar la aplicación
-        inicializarAppConFirebase();
+        // Escuchar el estado de autenticación de Firebase
+        auth.onAuthStateChanged((user) => {
+            const loginScreen = document.getElementById('login-screen');
+            const userEmailDisplay = document.getElementById('user-email-display');
+
+            if (user) {
+                // Usuario logueado: ocultamos la pantalla de login y mostramos su correo
+                loginScreen.style.display = 'none';
+                userEmailDisplay.innerText = user.email;
+                cargarDatosNube();
+            } else {
+                // Usuario no logueado: mostramos la pantalla de login
+                loginScreen.style.display = 'flex';
+                userEmailDisplay.innerText = '';
+                trucksData = {};
+            }
+        });
     </script>
 </body>
 </html>
