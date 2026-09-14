@@ -1909,13 +1909,9 @@
                         trucksData = importedData; 
                         sanitizeExistingData(); 
                         cleanUnusedDays();
-                        
-                        // Guardado automático en Firebase y almacenamiento local
-                        saveToStorage();
-
                         renderCalendar();
                         renderApp(); 
-                        alert("✅ ¡Datos importados y guardados en Firebase exitosamente!");
+                        alert("✅ ¡Datos cargados exitosamente!");
                     } else alert("⚠️ El archivo no tiene el formato correcto.");
                 } catch (error) { alert("❌ Error al leer el archivo JSON."); }
                 event.target.value = ''; 
